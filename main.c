@@ -8,12 +8,34 @@ struct ImageStructure
       int maxVal;
       int width;
       int height;
-      int** data;
+      int **data;
 };
-
 typedef struct ImageStructure Image;
-//
+//Structure histogramme
+struct PointHisto
+{
+      int niveau_gris;
+      int valeur;
+};
+typedef struct PointHisto PointHisto;
 
+struct Histogramme
+{
+      int valeur_max;
+      PointHisto* dataPoint;
+};
+typedef struct PointHisto PointHisto;
+typedef struct Histogramme Histogramme;
+//verifier les dimensions des images
+int verif_dimension(Image image1, Image image2)
+{
+      if (image1.height != image2.height || image1.width != image2.width)
+      {
+            printf("les deux n'ont pas la même dimension\n!");
+            return 0;
+      }
+      return 1;
+}
 
 void getPGMfile(char filename[], Image *img)
 {
@@ -61,17 +83,17 @@ void getPGMfile(char filename[], Image *img)
       printf("\n height = %d", (*img).height);
       printf("\n maxVal = %d", (*img).maxVal);
       printf("\n");
-      
+
       //allocation dynamique
-      int **data_pixel  = (int **)malloc(img->width * sizeof(int *));
-      for (int i=0; i<img->width; i++)
-         data_pixel[i] = (int *)malloc(img->height * sizeof(int));
+      int **data_pixel = (int **)malloc(img->width * sizeof(int *));
+      for (int i = 0; i < img->width; i++)
+            data_pixel[i] = (int *)malloc(img->height * sizeof(int));
       img->data = data_pixel;
       //
       if (((*img).width > MAX) || ((*img).height > MAX))
       {
             printf("\n\n***ERROR - image too big for current image structure***\n\n");
-            exit(1); 
+            exit(1);
       }
 
       for (row = 0; row < (*img).height; row++)
@@ -97,61 +119,141 @@ void getPGMfile(char filename[], Image *img)
       return &data_pixel;
 }*/
 
-//add brillance 
-void increaseLuminance(Image *img,int quantity){
-      
+//add brillance
+void increaseLuminance(Image *img, int quantity)
+{
+
       for (int i = 0; i < img->width; i++)
-            for (int j = 0; j < img->height; j++){
-                  if(img->data[i][j]+quantity>255 )
-                        img->data[i][j] =255; 
-                  else if(img->data[i][j]+quantity<0 )
-                        img->data[i][j] =0; 
+            for (int j = 0; j < img->height; j++)
+            {
+                  if (img->data[i][j] + quantity > 255)
+                        img->data[i][j] = 255;
+                  else if (img->data[i][j] + quantity < 0)
+                        img->data[i][j] = 0;
                   else
-                        img->data[i][j] += quantity; 
+                        img->data[i][j] += quantity;
             }
-                               
+}
+// multiplication de l'image
+void multiplicationParRatio(Image *img, float ratio)
+{
+
+      for (int i = 0; i < img->width; i++)
+            for (int j = 0; j < img->height; j++)
+            {
+                  if (img->data[i][j] * ratio > 255)
+                        img->data[i][j] = 255;
+                  else
+                        img->data[i][j] *= ratio;
+            }
 }
 // addition de deux images
-Image additionerImage(Image image1, Image image2){
-      Image result;
-      if(image1.height!=image2.height || image1.width!=image2.width){
-            printf("les deux n'ont pas la même dimension\n!");
-            exit(0);
-      }
-      //allocation dynamique
-      int **data_pixel  = (int **)malloc(image1.width * sizeof(int *));
-      for (int i=0; i<image1.width; i++)
-         data_pixel[i] = (int *)malloc(image1.height * sizeof(int));
-      result.data = data_pixel;
+Image additionerImage(Image image1, Image image2)
+{     Image *result = malloc(sizeof(Image));
+      verif_dimension(image1, image2);
+      //creation de image en sortie
+      initImage(result,image1.width,image1.height,image1.maxVal);
       //addition proprement dite
       for (int i = 0; i < image1.width; i++)
-            for (int j = 0; i < image1.height; i++)
-                  result.data[i][j] = image1.data[i][j]+image2.data[i][j];
-      return result;
+            for (int j = 0; j < image1.height; j++)
+                  if (image1.data[i][j] + image2.data[i][j] <= 255)
+                        result->data[i][j] =image1.data[i][j] + image2.data[i][j];
+                  else
+                        result->data[i][j] = 255;
+      return *result;
 }
+// soustration de deux images
+Image soustrationImage(Image image1, Image image2)
+{
+      Image *result = malloc(sizeof(Image));
+      verif_dimension(image1, image2);
+      //creation de image en sortie
+      initImage(result,image1.width,image1.height,image1.maxVal);
+      //addition proprement dite
+      for (int i = 0; i < image1.width; i++)
+            for (int j = 0; j < image1.height; j++)
+                  if (image1.data[i][j] - image2.data[i][j] >= 0)
+                        result->data[i][j] =image1.data[i][j] - image2.data[i][j];
+                  else
+                        result->data[i][j] = 0;
+      return *result;
+}
+
+//construction de histogramme
+// nombre d'occurence d'un niveau de gris donnée
+int nbOccurence(Image image, int niveau_gris){
+
+      int i,j;
+      int nbocc=0;
+      for (i = 0; i < image.width; i++)
+            for ( j = 0; j < image.height; j++)
+                  if(image.data[i][j]==niveau_gris)
+                        nbocc++;
+      return nbocc;
+}
+//  histogramme proprement dite
+Histogramme constructHistogramme(Image image){
+      int i;
+      Histogramme* histo = malloc(sizeof(Histogramme));
+      PointHisto* points = malloc(sizeof(PointHisto)*(image.maxVal+1));
+      histo->valeur_max = image.maxVal +1;
+
+      for(i=0; i<histo->valeur_max; i++){
+            points[i].niveau_gris =i;
+            points[i].valeur = nbOccurence(image,i);
+      }
+      histo->dataPoint = points;
+
+      return *histo;
+}
+// afficher histogramme
+void afficheHistogramme(Histogramme histo){
+      int i;
+      for ( i = 0; i < histo.valeur_max; i++)
+      {
+            printf("%d : %d \t",histo.dataPoint[i].niveau_gris,histo.dataPoint[i].valeur);
+      }
+      
+}
+
 //sauvegarde de la matrice d'image dans un fichier
-void save (Image *img,char output_file_name[]){
-     
-   FILE *iop;
-   int row,col;
-   int nr = (*img).height;
-   int nc = (*img).width;
-   iop = fopen(output_file_name, "w");
-   fprintf(iop, "P2\n");
-   fprintf(iop, "#created by a.exe\n");
-   fprintf(iop, "%d %d\n", nc, nr);
-   fprintf(iop, "255\n");
-   
-   for (row=0; row < nr; row++){
-       for (col=0; col< nc; col++)
-       {
-           fprintf(iop,"%d ",(*img).data[row][col]);
-       } 
-   }
-   fprintf(iop, "\n");
-   fclose(iop);
-     
+void save(Image *img, char output_file_name[])
+{
+
+      FILE *iop;
+      int row, col;
+      int nr = (*img).height;
+      int nc = (*img).width;
+      iop = fopen(output_file_name, "w");
+      fprintf(iop, "P2\n");
+      fprintf(iop, "#created by a.exe\n");
+      fprintf(iop, "%d %d\n", nc, nr);
+      fprintf(iop, "255\n");
+
+      for (row = 0; row < nr; row++)
+      {
+            for (col = 0; col < nc; col++)
+            {
+                  fprintf(iop, "%d ", (*img).data[row][col]);
+            }
+      }
+      fprintf(iop, "\n");
+      fclose(iop);
 }
+
+//fonction qui initialise une image
+void initImage(Image *image,int width,int height,int max_val)
+{
+      image->height = width;
+      image->width = height;
+      image->maxVal = max_val;
+      int **data = (int **)malloc(width * sizeof(int *));
+      for (int i = 0; i < width; i++)
+            data[i] = (int *)malloc(height * sizeof(int));
+      image->data = data;
+}
+
+
 // ecrire de la function qui charge et affiche une image
 void loadImage(FILE f)
 {
@@ -160,12 +262,19 @@ int main(int argc, char *argv[])
 {
       int i, j = 0, row, col;
       Image *image = malloc(sizeof(Image));
-
+      Image *output = malloc(sizeof(Image));
+      Image *image2 = malloc(sizeof(Image));
       getPGMfile("lena.pgm", &(*image));
-      increaseLuminance(image,50);
-      save(image,"resultuuu");
+      //increaseLuminance(image, 50);
+      save(image, "resultuuu");
       //test addition
-      additionerImage(*image,*image);
-      save(image,argv[1]);
+      Image imgadd=additionerImage(*image, *image);
+      Image sous =soustrationImage(imgadd,*image);
+      //multiplicationParRatio(image,1.2);
+      save(image, argv[1]);
+      //printf("le nombre de %d est %d",0,nbOccurence(*image,0));
+      printf("%d",image->maxVal);
+      Histogramme histo = constructHistogramme(*image);
+      afficheHistogramme(histo);
       return 0;
 }
