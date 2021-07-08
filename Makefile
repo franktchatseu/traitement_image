@@ -1,2 +1,3 @@
-prog:main.c
-	gcc main.c -o prog
+default: 
+	clear
+	gcc -o vision main.c

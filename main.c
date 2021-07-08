@@ -12,20 +12,32 @@ struct ImageStructure
 };
 typedef struct ImageStructure Image;
 //Structure histogramme
-struct PointHisto
+struct Point
 {
       int niveau_gris;
-      int valeur;
+      float valeur;
 };
-typedef struct PointHisto PointHisto;
+typedef struct Point Point;
 
 struct Histogramme
 {
       int valeur_max;
-      PointHisto* dataPoint;
+      Point* dataPoint;
 };
-typedef struct PointHisto PointHisto;
+typedef struct Point Point;
 typedef struct Histogramme Histogramme;
+
+//fonction qui initialise une image
+void initImage(Image *image,int width,int height,int max_val)
+{
+      image->height = width;
+      image->width = height;
+      image->maxVal = max_val;
+      int **data = (int **)malloc(width * sizeof(int *));
+      for (int i = 0; i < width; i++)
+            data[i] = (int *)malloc(height * sizeof(int));
+      image->data = data;
+}
 //verifier les dimensions des images
 int verif_dimension(Image image1, Image image2)
 {
@@ -195,7 +207,7 @@ int nbOccurence(Image image, int niveau_gris){
 Histogramme constructHistogramme(Image image){
       int i;
       Histogramme* histo = malloc(sizeof(Histogramme));
-      PointHisto* points = malloc(sizeof(PointHisto)*(image.maxVal+1));
+      Point* points = malloc(sizeof(Point)*(image.maxVal+1));
       histo->valeur_max = image.maxVal +1;
 
       for(i=0; i<histo->valeur_max; i++){
@@ -211,15 +223,61 @@ void afficheHistogramme(Histogramme histo){
       int i;
       for ( i = 0; i < histo.valeur_max; i++)
       {
-            printf("%d : %d \t",histo.dataPoint[i].niveau_gris,histo.dataPoint[i].valeur);
+            printf("%d : %f \t",histo.dataPoint[i].niveau_gris,histo.dataPoint[i].valeur);
       }
       
+}
+
+// transformation lineaire
+//1. det min pixel
+int getMinPixel(Image image){
+
+    int min = image.data[0][0];
+    for(int i=0; i<image.height;i++){
+        for(int j=0; j<image.width; j++){
+            if (image.data[i][j]<min){
+                min = image.data[i][j];
+            }
+        }
+    }
+    printf("le eest %d",min);
+    return min;
+}
+//2. det max pixel
+int getMaxPixel(Image image){
+
+    int max = image.data[0][0];
+    for(int i=0; i<image.height;i++){
+        for(int j=0; j<image.width; j++){
+            if (image.data[i][j]>max){
+                max = image.data[i][j];
+            }
+        }
+    }
+    printf("le eest %d",max);
+    return max;
+}
+//transformation lineaire
+Image transformationLineaire(Image image)
+{    
+       int maxPixel = getMaxPixel(image);
+       int minPixel = getMinPixel(image);
+       int denom = maxPixel - minPixel;
+       printf("le pixel max est %d et le pixel min est %d",maxPixel,minPixel);
+       Image *result = malloc(sizeof(Image));
+      //creation de image en sortie
+      initImage(result,image.width,image.height,image.maxVal);
+      for (int i = 0; i < image.width; i++)
+            for (int j = 0; j < image.height; j++)
+                  result->data[i][j] = 255*(image.data[i][j]-minPixel)/denom;
+
+      return *result;
 }
 
 //sauvegarde de la matrice d'image dans un fichier
 void save(Image *img, char output_file_name[])
 {
-
+      
       FILE *iop;
       int row, col;
       int nr = (*img).height;
@@ -241,17 +299,36 @@ void save(Image *img, char output_file_name[])
       fclose(iop);
 }
 
-//fonction qui initialise une image
-void initImage(Image *image,int width,int height,int max_val)
-{
-      image->height = width;
-      image->width = height;
-      image->maxVal = max_val;
-      int **data = (int **)malloc(width * sizeof(int *));
-      for (int i = 0; i < width; i++)
-            data[i] = (int *)malloc(height * sizeof(int));
-      image->data = data;
+// egalisation de Histogramme
+Image egalisationHistogramme(Image image){
+      // recuperation du nombre de pixel total
+      int total = image.width * image.height;
+      // calcul de histogramme
+      Histogramme histo = constructHistogramme(image);
+      // Normalisation de l'histogramme
+      for (int i = 0; i < histo.valeur_max; i++)
+      {
+        histo.dataPoint[i].valeur = (float)((histo.dataPoint[i]).valeur)/total;
+      }
+      afficheHistogramme(histo);
+
+      // Densite de probabilite normalisee
+      float densite[histo.valeur_max];
+      printf("calcul");
+      densite[0] = histo.dataPoint[0].valeur;
+      for (int k = 1; k < histo.valeur_max; k++)
+      {
+            densite[k] = densite[k-1] + histo.dataPoint[k].valeur;
+      }
+    // modification niveaux de gris de l'image
+    for(int i=0; i< image.height; i++){
+        for(int j=0; j< image.width; j++){
+            image.data[i][j] = densite[image.data[i][j]] * 255;
+        }
+    }
+    return image;
 }
+
 
 
 // ecrire de la function qui charge et affiche une image
@@ -264,17 +341,19 @@ int main(int argc, char *argv[])
       Image *image = malloc(sizeof(Image));
       Image *output = malloc(sizeof(Image));
       Image *image2 = malloc(sizeof(Image));
-      getPGMfile("lena.pgm", &(*image));
+      getPGMfile("fillete.pgm", &(*image));
       //increaseLuminance(image, 50);
-      save(image, "resultuuu");
+      //save(image, "resultuuu");
       //test addition
-      Image imgadd=additionerImage(*image, *image);
-      Image sous =soustrationImage(imgadd,*image);
+      //Image imgadd=additionerImage(*image, *image);
+      //Image sous =soustrationImage(imgadd,*image);
       //multiplicationParRatio(image,1.2);
-      save(image, argv[1]);
+      //Image trans = transformationLineaire(*image);
+      Image egal = egalisationHistogramme(*image);
+      save(&egal, argv[1]);
       //printf("le nombre de %d est %d",0,nbOccurence(*image,0));
       printf("%d",image->maxVal);
-      Histogramme histo = constructHistogramme(*image);
-      afficheHistogramme(histo);
+      //Histogramme histo = constructHistogramme(*image);
+      //afficheHistogramme(histo);
       return 0;
 }
