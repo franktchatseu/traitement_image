@@ -1,3 +1,3 @@
 default: 
 	clear
-	gcc -o vision main.c -lm
+	gcc -o vision fonction.c main.c -lm

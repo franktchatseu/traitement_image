@@ -16,5 +16,10 @@
             "**/*_adt.pvs": false,
             "**/*.log": true,
             "**/.vscode": true
+      },
+      "files.associations": {
+            "stdlib.h": "c",
+            "stdio.h": "c",
+            "fonction.h": "c"
       }
 }
